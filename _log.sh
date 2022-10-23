@@ -17,6 +17,15 @@
 # default:
 #   2
 #
+# if you want to redirect logs into custom files, you can
+#   exec {_BASHFUNC_LOG_OUT_FD}>/path/to/file
+#   exec {_BASHFUNC_LOG_ERR_FD}>/path/to/file
+# before sourcing this file. Or if you have sourced, you can
+#   exec {_ANY_VAR_NAME0}>/path/to/file
+#   exec {_ANY_VAR_NAME1}>/path/to/file
+#   _BASHFUNC_LOG_OUT_FD=${_ANY_VAR_NAME0}
+#   _BASHFUNC_LOG_ERR_FD=${_ANY_VAR_NAME1}
+#
 # with different levels
 #
 #   e: print to error level
