@@ -6,7 +6,7 @@
 # License: GPL-2
 #
 # Print command and arguments to default stdout with
-# a different FD number, so it won't affect FD 1,
+# a different FD number, so it won't affect or be affected by FD 1,
 # and run it with all passed arguments
 #
 # the output can be controled by _BASHFUNC_DO_OFD var after this file sourced
