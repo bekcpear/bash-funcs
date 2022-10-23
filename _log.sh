@@ -52,7 +52,7 @@
 # variable:
 #   _BASHFUNC_LOG_DATE_FORMAT <DATE-FORMAT-PATTERN>
 # default:
-#   +%Y-%m-%d %H:%M:%S
+#   "+[%Y-%m-%d %H:%M:%S] "
 #
 [[ -z ${_BASHFUNC_LOG} ]] || return 0
 _BASHFUNC_LOG=1
@@ -61,7 +61,7 @@ _BASHFUNC_LOG=1
 : ${_BASHFUNC_LOG_OUT_FD:=1}
 : ${_BASHFUNC_LOG_ERR_FD:=2}
 : ${_BASHFUNC_LOG_DATE:=on}
-: ${_BASHFUNC_LOG_DATE_FORMAT:="+%Y-%m-%d %H:%M:%S"}
+: ${_BASHFUNC_LOG_DATE_FORMAT:="+[%Y-%m-%d %H:%M:%S] "}
 
 declare -A _BASHFUNC_LOG_LEVEL_INTERNAL=(
   [debug]=3
@@ -118,7 +118,7 @@ _log() {
   shift
 
   if [[ ${_BASHFUNC_LOG_DATE} == "on" ]]; then
-    local datetime="[$(date '+%Y-%m-%d %H:%M:%S')] "
+    local datetime=$(date "${_BASHFUNC_LOG_DATE_FORMAT}")
   fi
 
   eval ">&${out} echo -ne '${format}${datetime}'"
