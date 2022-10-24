@@ -67,6 +67,7 @@
 #   _BASHFUNC_OPTS_USAGE="{options} other-args"
 #   _BASHFUNC_OPTS_DESC="some descriptions"$'\n'"some descriptions"
 #   _opts_handle "${@}"
+#   set -- "${_opts_remaining}"
 #   if [[ -n _opt_s_trigger_a ]]; then
 #     ...
 #   fi
@@ -192,7 +193,7 @@ ${__BASHFUNC_OPTS_OPTDESC}
 "
 }
 
-declare -A __BASHFUNC_OPTS_VALUE_R
+declare -A __BASHFUNC_OPTS_VALUE_R __BASHFUNC_OPTS_SHORT_R __BASHFUNC_OPTS_LONG_R
 __opts_make_help() {
   local i s l t v d ot lt sep= default left maxlen=0
   local -a lefts rights
@@ -216,12 +217,14 @@ __opts_make_help() {
       __BASHFUNC_OPTS_VALUE_R[${s:-__empty}]=1
       __BASHFUNC_OPTS_VALUE_R[${l:-__empty}]=1
     fi
-    s=${s:+-${s}}
-    l=${l:+--${l}}
     sep=
     if [[ -n ${s} ]] && [[ -n ${l} ]]; then
       sep=', '
+      __BASHFUNC_OPTS_SHORT_R[${s}]="${l}"
+      __BASHFUNC_OPTS_LONG_R[${l}]="${s}"
     fi
+    s=${s:+-${s}}
+    l=${l:+--${l}}
     left="${s}${ot}${sep}${l}${lt}"
     if [[ ${#left} -gt ${maxlen} ]]; then
       maxlen=${#left}
@@ -277,7 +280,7 @@ _opts_handle() {
   fi
   eval "${_errexit}"
 
-  local this_arg to_store_value_s to_store_value_l is_remaining
+  local this_arg this_arg_r to_store_value_s to_store_value_l is_remaining
   eval "set -- ${args}"
   for arg in "${@}"; do
     if [[ -n ${is_remaining} ]]; then
@@ -285,13 +288,18 @@ _opts_handle() {
       continue
     fi
 
+    local to_store_value=0
     if [[ -n ${to_store_value_s} ]]; then
       eval "_opts_s_value_${to_store_value_s}=\${arg}"
       to_store_value_s=
-      continue
-    elif [[ -n ${to_store_value_l} ]]; then
+      to_store_value=1
+    fi
+    if [[ -n ${to_store_value_l} ]]; then
       eval "_opts_l_value_${to_store_value_l}=\${arg}"
       to_store_value_l=
+      to_store_value=1
+    fi
+    if [[ ${to_store_value} == 1 ]]; then
       continue
     fi
 
@@ -301,11 +309,25 @@ _opts_handle() {
       if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg}]} ]]; then
         to_store_value_s=${this_arg}
       fi
+      this_arg_r=${__BASHFUNC_OPTS_SHORT_R[${this_arg}]}
+      if [[ -n ${this_arg_r} ]]; then
+        eval "_opts_l_trigger_${this_arg_r}=1"
+        if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg_r}]} ]]; then
+          to_store_value_l=${this_arg_r}
+        fi
+      fi
     elif [[ ${arg} =~ ^--.+ ]]; then
       this_arg=${arg#--}
       eval "_opts_l_trigger_${this_arg}=1"
       if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg}]} ]]; then
         to_store_value_l=${this_arg}
+      fi
+      this_arg_r=${__BASHFUNC_OPTS_LONG_R[${this_arg}]}
+      if [[ -n ${this_arg_r} ]]; then
+        eval "_opts_s_trigger_${this_arg_r}=1"
+        if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg_r}]} ]]; then
+          to_store_value_s=${this_arg_r}
+        fi
       fi
     elif [[ ${arg} =~ ^--$ ]]; then
       is_remaining=1
