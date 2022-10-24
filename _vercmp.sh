@@ -78,7 +78,9 @@ __bashfunc_vercmp_compare_ver() {
 }
 __bashfunc_vercmp_compare() {
   local v0 v1 vv0 vv1 len res
-  IFS="." v0=(${1}) v1=(${2})
+  OIFS=$IFS; IFS="."
+  v0=(${1}) v1=(${2})
+  IFS=$OIFS
   if [[ ${#v0[@]} -ge ${#v1[@]} ]]; then
     len=${#v0[@]}
   else
@@ -112,7 +114,9 @@ _vercmp() {
   local str0_pkgname str0_ver str0_pre
   local str1_pkgname str1_ver str1_pre
 
-  IFS="-" str0=( $(__bashfunc_vercmp_remove_ext ${1}) ) str1=( $(__bashfunc_vercmp_remove_ext ${2}) )
+  OIFS=$IFS; IFS="-"
+  str0=( $(__bashfunc_vercmp_remove_ext ${1}) ) str1=( $(__bashfunc_vercmp_remove_ext ${2}) )
+  IFS=$OIFS
 
   for _str in "str0" "str1"; do
     local _strA="${_str}[@]" _strV="${_str}_ver" _strP="${_str}_pre" _strN="${_str}_pkgname"
