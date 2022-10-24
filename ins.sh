@@ -43,7 +43,7 @@ if [[ ! ${_src} =~ ^(/|~) ]]; then
   if [[ -z ${_real_src} ]]; then
     _real_src=$(ls -1 ${_func_dir}/*${_dest}* 2>/dev/null | head -1)
     if [[ -z ${_real_src} ]]; then
-      _log ee _help "cannot find the function file '${_src}' to insert."
+      _log ee _bashfunc_help "cannot find the function file '${_src}' to insert."
     else
       _dest=${_src}
     fi
@@ -55,7 +55,7 @@ fi
 _dest=$(realpath ${_dest})
 
 [[ -f ${_dest} ]] || \
-    _log ee _help "'${_dest}' is not a regular file as the destination."
+    _log ee _bashfunc_help "'${_dest}' is not a regular file as the destination."
 
 # remove old
 _func_match="$(grep -E '^# BASHFUNC[[:digit:]]' ${_real_src} | head -1 | cut -d' ' -f1-3)"
