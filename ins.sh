@@ -9,16 +9,20 @@
 
 _help() {
   echo "
-Usage: $(basename $0) <SCRIPT-FILE-PATH> <FUNCTION-NAME>
+Usage: $(basename $0) [-r] <SCRIPT-FILE-PATH> <FUNCTION-NAME>
 
   insert/update all content from file specified by <FUNCTION-NAME> into <SCRIPT-FILE-PATH>
   after an anchor beginning with \"###_BASHFUNC\" or after the first uncommented line
+
+    -r      remove the specified function
 "
 }
 
 if [[ $1 =~ ^(-h|--help) ]]; then
   _help
   exit
+elif [[ $1 == '-r' ]]; then
+  removeonly=1
 fi
 
 _dest="${1}"
@@ -76,6 +80,8 @@ if [[ ${#_func_match_nums[@]} -gt 0 ]]; then
     _log ee "too many matches(${#_func_match_nums[@]}) at line ${_func_match_nums[@]} for '${_real_src}', please handle manually."
   fi
 fi
+
+[[ -z ${removeonly} ]] || exit 0
 
 # get the insert line num
 _ins_line=$(sed -nE '/^[[:space:]]*###_BASHFUNC/=' "${_dest}" | head -1)
