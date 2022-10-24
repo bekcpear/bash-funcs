@@ -7,33 +7,33 @@
 # after an anchor beginning with "###_BASHFUNC or after the first uncommented line"
 #
 
-_help() {
-  echo "
-Usage: $(basename $0) [-r] <SCRIPT-FILE-PATH> <FUNCTION-NAME>
+_func_dir=$(dirname $(realpath $0))
+. ${_func_dir}/_log.sh
+. ${_func_dir}/_do.sh
+. ${_func_dir}/_opts.sh
 
-  insert/update all content from file specified by <FUNCTION-NAME> into <SCRIPT-FILE-PATH>
-  after an anchor beginning with \"###_BASHFUNC\" or after the first uncommented line
+_BASHFUNC_OPTS_USAGE="[-r] <SCRIPT-FILE-PATH> <FUNCTION-NAME>"
+_BASHFUNC_OPTS_DESC="insert/update all content from file specified by <FUNCTION-NAME> into <SCRIPT-FILE-PATH>
+after an anchor beginning with \"###_BASHFUNC\" or after the first uncommented line"
 
-    -r      remove the specified function
-"
-}
+_opts_add -o r -l remove -i "remove the specified function"
+_opts_add -o h -l help -i "show this help"
 
-if [[ $1 =~ ^(-h|--help) ]]; then
-  _help
+_opts_handle "${@}"
+
+if [[ -n ${_opts_s_trigger_h} ]]; then
+  _bashfunc_help
   exit
-elif [[ $1 == '-r' ]]; then
+fi
+if [[ -n ${_opts_s_trigger_r} ]]; then
   removeonly=1
 fi
 
 _dest="${1}"
 _src="${2}"
 
-_func_dir=$(dirname $(realpath $0))
-. ${_func_dir}/_log.sh
-. ${_func_dir}/_do.sh
-
 if [[ -z ${_dest} ]] || [[ -z ${_src} ]]; then
-  _help
+  _bashfunc_help
   exit 1
 fi
 
