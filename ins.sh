@@ -22,11 +22,11 @@ _opts_add -o h -l help -i "show this help"
 _opts_handle "${@}"
 set -- "${_opts_remaining[@]}"
 
-if [[ -n ${_opts_s_trigger_h} ]]; then
+if [[ -n ${_opts_trigger_h} ]]; then
   _bashfunc_help
   exit
 fi
-if [[ -n ${_opts_s_trigger_r} ]]; then
+if [[ -n ${_opts_trigger_r} ]]; then
   removeonly=1
 fi
 

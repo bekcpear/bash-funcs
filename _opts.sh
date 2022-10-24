@@ -30,7 +30,7 @@
 #     This function does a lot of things, includes make the variable which called within the
 #     _bashfunc_help function, and make all variables which represent added options:
 #
-#       _opts_s_trigger_<short-opt-name> for each triggered short opt name
+#       _opts_trigger_<short-opt-name>   for each triggered short opt name
 #       _opts_l_trigger_<long-opt-name>  for each triggered long opt name
 #
 #       _opts_s_value_<short-opt-name>  to store the value of each triggered short opt
@@ -68,7 +68,7 @@
 #   _BASHFUNC_OPTS_DESC="some descriptions"$'\n'"some descriptions"
 #   _opts_handle "${@}"
 #   set -- "${_opts_remaining}"
-#   if [[ -n _opt_s_trigger_a ]]; then
+#   if [[ -n _opt_trigger_a ]]; then
 #     ...
 #   fi
 #   ...
@@ -305,7 +305,7 @@ _opts_handle() {
 
     if [[ ${arg} =~ ^-[a-zA-Z]$ ]]; then
       this_arg=${arg#-}
-      eval "_opts_s_trigger_${this_arg}=1"
+      eval "_opts_trigger_${this_arg}=1"
       if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg}]} ]]; then
         to_store_value_s=${this_arg}
       fi
@@ -324,7 +324,7 @@ _opts_handle() {
       fi
       this_arg_r=${__BASHFUNC_OPTS_LONG_R[${this_arg}]}
       if [[ -n ${this_arg_r} ]]; then
-        eval "_opts_s_trigger_${this_arg_r}=1"
+        eval "_opts_trigger_${this_arg_r}=1"
         if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg_r}]} ]]; then
           to_store_value_s=${this_arg_r}
         fi
