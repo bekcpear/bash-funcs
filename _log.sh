@@ -63,6 +63,16 @@
 # default:
 #   "+[%Y-%m-%d %H:%M:%S] "
 #
+# you can also specify a custom echo function name, this custom function
+# should implements the same basic functions as bash buildin echo, and
+# should also implements the same functions of options -e, this function
+# can be specified by
+#
+# variable:
+#   _BASHFUNC_LOG_ECHO_FUNC <FUNCNAME>
+# default:
+#   echo
+#
 [[ -z ${_BASHFUNC_LOG} ]] || return 0
 _BASHFUNC_LOG=1
 
@@ -71,6 +81,7 @@ _BASHFUNC_LOG=1
 : ${_BASHFUNC_LOG_ERR_FD:=2}
 : ${_BASHFUNC_LOG_DATE:=on}
 : ${_BASHFUNC_LOG_DATE_FORMAT:="+[%Y-%m-%d %H:%M:%S] "}
+: ${_BASHFUNC_LOG_ECHO_FUNC:=echo}
 
 declare -A _BASHFUNC_LOG_LEVEL_INTERNAL=(
   [debug]=3
@@ -84,14 +95,14 @@ _log() {
   [[ -n ${2} ]] || return 0
 
   local lv=${_BASHFUNC_LOG_LEVEL_INTERNAL[${_BASHFUNC_LOG_LEVEL}]}
-  local out= format= fatal= endfunc=
+  local out= fatal= endfunc= msg=
   case ${1} in
     d)
       if [[ ${lv} -lt 3 ]]; then
         return 0
       fi
       out=${_BASHFUNC_LOG_OUT_FD}
-      format='\x1b[1m'
+      msg='\x1b[1m'
       ;;
     i)
       if [[ ${lv} -lt 2 ]]; then
@@ -104,15 +115,15 @@ _log() {
         return 0
       fi
       out=${_BASHFUNC_LOG_ERR_FD}
-      format='\x1b[1m\x1b[33m'
+      msg='\x1b[1m\x1b[33m'
       ;;
     e)
       out=${_BASHFUNC_LOG_ERR_FD}
-      format='\x1b[1m\x1b[31m'
+      msg='\x1b[1m\x1b[31m'
       ;;
     ee)
       out=${_BASHFUNC_LOG_ERR_FD}
-      format='\x1b[1m\x1b[31m'
+      msg='\x1b[1m\x1b[31m'
       fatal=${1}
       if declare -F "${2}" &>/dev/null; then
         endfunc=${2}
@@ -127,12 +138,12 @@ _log() {
   shift
 
   if [[ ${_BASHFUNC_LOG_DATE} == "on" ]]; then
-    local datetime=$(date "${_BASHFUNC_LOG_DATE_FORMAT}")
+    msg+=$(date "${_BASHFUNC_LOG_DATE_FORMAT}")
   fi
 
-  eval ">&${out} echo -ne '${format}${datetime}'"
-  eval ">&${out} echo -n  \"\${@}\""
-  eval ">&${out} echo -e  '\\x1b[0m'"
+  msg+="${@}"
+  msg+='\x1b[0m'
+  eval ">&${out} ${_BASHFUNC_LOG_ECHO_FUNC} -e \${msg}"
 
   if [[ ${fatal} == "ee" ]]; then
     if [[ ${_BASHFUNC_LAST_EXIT} == 0 ]]; then
