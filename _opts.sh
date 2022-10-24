@@ -30,11 +30,11 @@
 #     This function does a lot of things, includes make the variable which called within the
 #     _bashfunc_help function, and make all variables which represent added options:
 #
-#       _opts_s_tigger_<short-opt-name> for each tiggered short opt name
-#       _opts_l_tigger_<long-opt-name>  for each tiggered long opt name
+#       _opts_s_trigger_<short-opt-name> for each triggered short opt name
+#       _opts_l_trigger_<long-opt-name>  for each triggered long opt name
 #
-#       _opts_s_value_<short-opt-name>  to store the value of each tiggered short opt
-#       _opts_l_value_<long-opt-name>   to store the value of each tiggered long opt
+#       _opts_s_value_<short-opt-name>  to store the value of each triggered short opt
+#       _opts_l_value_<long-opt-name>   to store the value of each triggered long opt
 #
 #       _opts_remaining                 array to store all unparsed arguments
 #
@@ -67,7 +67,7 @@
 #   _BASHFUNC_OPTS_USAGE="{options} other-args"
 #   _BASHFUNC_OPTS_DESC="some descriptions"$'\n'"some descriptions"
 #   _opts_handle "${@}"
-#   if [[ -n _opt_s_tigger_a ]]; then
+#   if [[ -n _opt_s_trigger_a ]]; then
 #     ...
 #   fi
 #   ...
@@ -179,7 +179,7 @@ __opts_make_long() {
 __BASHFUNC_OPTS_OPTDESC=""
 _bashfunc_help() {
   echo "
-Usage: ${_BASHFUNC_OPTS_NAME} ${_BASHFUNC_OPTS_USAGE:-{options}}
+Usage: ${_BASHFUNC_OPTS_NAME} ${_BASHFUNC_OPTS_USAGE:-{options\}}
 "
   while read line; do
     if [[ ${line} =~ ^[[:space:]]*$ ]]; then
@@ -297,13 +297,13 @@ _opts_handle() {
 
     if [[ ${arg} =~ ^-[a-zA-Z]$ ]]; then
       this_arg=${arg#-}
-      eval "_opts_s_tigger_${this_arg}=1"
+      eval "_opts_s_trigger_${this_arg}=1"
       if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg}]} ]]; then
         to_store_value_s=${this_arg}
       fi
     elif [[ ${arg} =~ ^--.+ ]]; then
       this_arg=${arg#--}
-      eval "_opts_l_tigger_${this_arg}=1"
+      eval "_opts_l_trigger_${this_arg}=1"
       if [[ -n ${__BASHFUNC_OPTS_VALUE_R[${this_arg}]} ]]; then
         to_store_value_l=${this_arg}
       fi
