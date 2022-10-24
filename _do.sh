@@ -9,9 +9,30 @@
 # a different FD number, so it won't affect or be affected by FD 1,
 # and run it with all passed arguments
 #
-# the output can be controled by _BASHFUNC_DO_OFD var after this file sourced
-#   e.g.:  eval "exec ${_BASHFUNC_DO_OFD}>/path/to/file"
-# or directly assign a valid FD number to _BASHFUNC_DO_OFD before source this file
+# the output is controled by
+#
+# variable:
+#   _BASHFUNC_DO_OFD <FD-NUM>
+# default:
+#   an auto assigned FD number which point to the file which the current FD 1 pointed to
+#
+# if you want to redirect into custom files, you can
+#   exec {_BASHFUNC_DO_OFD}>/path/to/file
+# before sourcing this file. Or if you have sourced, you can
+#   eval "exec ${_BASHFUNC_DO_OFD}>/path/to/file"
+#
+# the output string can also be prefixed with a datetime,
+# which controled by
+#
+# variable:
+#   _BASHFUNC_DO_DATE on|off
+# default:
+#   on
+#
+# variable:
+#   _BASHFUNC_DO_DATE_FORMAT <DATE-FORMAT-PATTERN>
+# default:
+#   "+[%Y-%m-%d %H:%M:%S] "
 #
 [[ -z ${_BASHFUNC_DO} ]] || return 0
 _BASHFUNC_DO=1
@@ -20,10 +41,19 @@ if [[ -z ${_BASHFUNC_DO_OFD} ]]; then
   eval "exec {_BASHFUNC_DO_OFD}>$(realpath /proc/$$/fd/1)"
 fi
 
+: ${_BASHFUNC_DO_DATE:=on}
+: ${_BASHFUNC_DO_DATE_FORMAT:="+[%Y-%m-%d %H:%M:%S] "}
+
 _do() {
   [[ -n ${1} ]] || return 0
-  eval "echo -en \"\\x1b[1m\\x1b[32m>>> \\x1b[0m\" >&${_BASHFUNC_DO_OFD}"
-  eval "echo \"\${@}\" >&${_BASHFUNC_DO_OFD}"
+
+  local msg='\x1b[1m\x1b[32m'
+  if [[ ${_BASHFUNC_DO_DATE} == "on" ]]; then
+    msg+=$(date "${_BASHFUNC_DO_DATE_FORMAT}")
+  fi
+  msg+='>>>\x1b[0m '
+  msg+="${@}"
+  eval ">&${_BASHFUNC_DO_OFD} echo -e \${msg}"
   "${@}"
 }
 #
