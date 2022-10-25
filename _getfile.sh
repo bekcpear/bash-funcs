@@ -24,13 +24,13 @@
 #      if verification fails, the downloaded contents will be removed, and try again
 #     DETAILS format: METHOD MORE-DETAILS
 #     METHOD is one of    sig:  use binded signature to verify
-#                               MORE-DETAILS: FINGERPRINT [KEY-URL]
+#                               MORE-DETAILS: [FINGERPRINT] [KEY-URL]
 #                                if KEY-URL not provided and key does not exists,
 #                                it will try to import key from the default key server
 #                                FINGERPRINT: fp:<hex-string>
 #                                    KEY-URL: key:<url>
 #                        dsig:  use detached signature file to verify
-#                               MORE-DETAILS: [L-PATH] URL FINGERPRINT [KEY-URL]
+#                               MORE-DETAILS: [L-PATH] URL [FINGERPRINT] [KEY-URL]
 #                                if L-PATH provided and exists, it will use this file to check
 #                                                               without downloading from remote;
 #                                                if not exists, the downloaded signature will be
@@ -172,7 +172,6 @@ _getfile_queue() {
         __BASHFUNC_GETFILE_FILE_SIG_TYPE[${index}]="binded"
         __BASHFUNC_GETFILE_FILE_SIG_KEY_FP[${index}]="${_details_arg[fp]}"
         __BASHFUNC_GETFILE_FILE_SIG_KEY_REMOTE[${index}]="${_details_arg[key]}"
-        __bashfunc_getfile_queue_missing_arg ${__BASHFUNC_GETFILE_FILE_SIG_KEY_FP[${index}]} fp sig || return $?
         __BASHFUNC_GETFILE_FILE_HAS_VMETHOD[${index}]=1
         ;;
       dsig)
@@ -185,7 +184,6 @@ _getfile_queue() {
            [[ -z ${__BASHFUNC_GETFILE_FILE_SIG_REMOTE[${index}]} ]]; then
           __bashfunc_getfile_queue_missing_arg "" "path/url" dsig || return $?
         fi
-        __bashfunc_getfile_queue_missing_arg ${__BASHFUNC_GETFILE_FILE_SIG_KEY_FP[${index}]} fp dsig || return $?
         __BASHFUNC_GETFILE_FILE_HAS_VMETHOD[${index}]=1
         ;;
       b2)
@@ -266,16 +264,18 @@ __bashfunc_getfile_curl() {
   eval "__bashfunc_getfile_do ${_BASHFUNC_GETFILE_DOWNLOAD_CMD}"
 }
 __bashfunc_getfile_key_import() {
+  local _ret
   if [[ -n "${1}" ]]; then
     __bashfunc_getfile_log i "download key from '${1}' ..."
     local tmpfile=$(mktemp -u)
-    __bashfunc_getfile_curl "${tmpfile}" "${1}"
-    __bashfunc_getfile_do gpg --import "${tmpfile}"
-    __bashfunc_getfile_do rm -f "${tmpfile}"
+    __bashfunc_getfile_curl "${tmpfile}" "${1}" && \
+      __bashfunc_getfile_do gpg --import "${tmpfile}" || _ret=$?
+    __bashfunc_getfile_do rm -f "${tmpfile}" || _ret=$?
   else
     __bashfunc_getfile_log w "key url does not provide, try importing from the default key server ..."
-    __bashfunc_getfile_do gpg --receive-key "${2}"
+    __bashfunc_getfile_do gpg --receive-key "${2}" || _ret=$?
   fi
+  return ${_ret}
 }
 __bashfunc_getfile_key_exists() {
   if ! gpg --list-key "${1}" &>/dev/null; then
@@ -327,48 +327,52 @@ _getfile() {
         # do verification
         # verify signature
         if [[ -n ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} ]]; then
-          fp="0x${__BASHFUNC_GETFILE_FILE_SIG_KEY_FP[$i]#0x}"
+          fp="${__BASHFUNC_GETFILE_FILE_SIG_KEY_FP[$i]#0x}"
+          fp="${fp#0X}"
+          fp="${fp:+0x}${fp}"
           key="${__BASHFUNC_GETFILE_FILE_SIG_KEY_REMOTE[$i]}"
-          __bashfunc_getfile_log i "verifying '${path}' by signature with key '${fp}' ..."
-          if ! __bashfunc_getfile_key_exists "${fp}"; then
-            __bashfunc_getfile_log w "key '${fp}' does not exist"
-            __bashfunc_getfile_key_import "${key}" "${fp}"
-          fi
-          if ! __bashfunc_getfile_key_exists "${fp}"; then
-            __bashfunc_getfile_log e "key '${fp}' is still does not exist, skip verifying signature ..."
+          __bashfunc_getfile_log i "verifying '${path}' by signature ..."
+          if [[ -z ${fp} ]]; then
+            if [[ -n ${key} ]]; then
+              __bashfunc_getfile_key_import "${key}"
+            fi
           else
-            case ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} in
-              binded)
-                __bashfunc_getfile_log i "binded signature"
-                tmpfile=$(mktemp -u)
-                if __bashfunc_getfile_do gpg --output "${tmpfile}" --decrypt "${path}"; then
-                  __bashfunc_getfile_do mv "${tmpfile}" "${path}"
-                else
-                  ___verify_fail_handler "binded signature"
-                  return 1
-                fi
-                ;;
-              detached)
-                __bashfunc_getfile_log i "detached signature"
-                sig_path="${__BASHFUNC_GETFILE_FILE_SIG_LOCAL[$i]}"
-                sig_url="${__BASHFUNC_GETFILE_FILE_SIG_REMOTE[$i]}"
-                if [[ -e "${sig_path}" ]]; then
-                  __bashfunc_getfile_log i "use local signature file '${sig_path}' to verify ..."
-                else
-                  if [[ -z ${sig_path} ]]; then
-                    sig_path="$(mktemp -u)"
-                    trashes+=("${sig_path}")
-                  fi
-                  __bashfunc_getfile_log i "downloading signature file from '${sig_url}' ..."
-                  __bashfunc_getfile_curl "${sig_path}" "${sig_url}"
-                fi
-                if ! __bashfunc_getfile_do gpg --verify "${sig_path}" "${path}"; then
-                  ___verify_fail_handler "detached signature"
-                  return 1
-                fi
-                ;;
-            esac
+            if ! __bashfunc_getfile_key_exists "${fp}"; then
+              __bashfunc_getfile_log w "key '${fp}' does not exist"
+              __bashfunc_getfile_key_import "${key}" "${fp}"
+            fi
           fi
+          case ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} in
+            binded)
+              __bashfunc_getfile_log i "binded signature"
+              tmpfile=$(mktemp -u)
+              if __bashfunc_getfile_do gpg --output "${tmpfile}" --decrypt "${path}"; then
+                __bashfunc_getfile_do mv "${tmpfile}" "${path}"
+              else
+                ___verify_fail_handler "binded signature"
+                return 1
+              fi
+              ;;
+            detached)
+              __bashfunc_getfile_log i "detached signature"
+              sig_path="${__BASHFUNC_GETFILE_FILE_SIG_LOCAL[$i]}"
+              sig_url="${__BASHFUNC_GETFILE_FILE_SIG_REMOTE[$i]}"
+              if [[ -e "${sig_path}" ]]; then
+                __bashfunc_getfile_log i "use local signature file '${sig_path}' to verify ..."
+              else
+                if [[ -z ${sig_path} ]]; then
+                  sig_path="$(mktemp -u)"
+                  trashes+=("${sig_path}")
+                fi
+                __bashfunc_getfile_log i "downloading signature file from '${sig_url}' ..."
+                __bashfunc_getfile_curl "${sig_path}" "${sig_url}"
+              fi
+              if ! __bashfunc_getfile_do gpg --verify "${sig_path}" "${path}"; then
+                ___verify_fail_handler "detached signature"
+                return 1
+              fi
+              ;;
+          esac
         fi
 
         # verify hash
