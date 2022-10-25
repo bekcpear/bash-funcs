@@ -143,7 +143,7 @@ _log() {
 
   msg+="${@}"
   msg+='\x1b[0m'
-  eval ">&${out} ${_BASHFUNC_LOG_ECHO_FUNC} -e \${msg}"
+  eval ">&${out} ${_BASHFUNC_LOG_ECHO_FUNC} -e \"\${msg}\""
 
   if [[ ${fatal} == "ee" ]]; then
     if [[ ${_BASHFUNC_LAST_EXIT} == 0 ]]; then
