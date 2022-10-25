@@ -1,6 +1,6 @@
 #
 # **BEGIN**
-# BASHFUNC00: _do COMMAND {ARGUMENT}
+# BASHFUNC00: _do [-p PREFIX] COMMAND {ARGUMENT}
 #
 #  Author: Ryan Qian <i@bitbili.net>
 # License: GPL-2
@@ -8,6 +8,12 @@
 # Print command and arguments to default stdout with
 # a different FD number, so it won't affect or be affected by FD 1,
 # and run it with all passed arguments
+#
+# option:
+#   -p PREFIX
+# description:
+#   optional, MUST be at the begining of all arguments
+#   it will add a prefix to the output
 #
 # the output is controled by
 #
@@ -45,18 +51,26 @@ fi
 : ${_BASHFUNC_DO_DATE_FORMAT:="+[%Y-%m-%d %H:%M:%S] "}
 
 _do() {
+  local prefix
+  if [[ ${1} == "-p" ]]; then
+    shift
+    prefix="${1}"
+    shift
+  fi
+
   [[ -n ${1} ]] || return 0
 
   local msg='\x1b[1m\x1b[32m'
   if [[ ${_BASHFUNC_DO_DATE} == "on" ]]; then
     msg+=$(date "${_BASHFUNC_DO_DATE_FORMAT}")
   fi
+  msg+="${prefix}${prefix:+ }"
   msg+='>>>\x1b[0m '
   msg+="${@}"
   eval ">&${_BASHFUNC_DO_OFD} echo -e \${msg}"
   "${@}"
 }
 #
-# BASHFUNC00: _do COMMAND {ARGUMENT}
+# BASHFUNC00: _do [-p PREFIX] COMMAND {ARGUMENT}
 # **END**
 #
