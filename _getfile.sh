@@ -14,7 +14,7 @@
 # There are two functions to control this progress.
 #
 # function:
-#   _getfile_queue { -v " DETAILS " } LOCAL-PATH REMOTE-URL
+#   _getfile_queue { -v " DETAILS " } -l LOCAL-PATH -r REMOTE-URL
 # description:
 #   add download task to the queue
 # options:
@@ -111,9 +111,11 @@ _getfile_queue() {
     if [[ ${1} == '-v' ]]; then
       shift
       v+=("${1}")
-    elif [[ -z ${l} ]]; then
+    elif [[ ${1} == '-l' ]]; then
+      shift
       l="${1}"
-    elif [[ -z ${r} ]]; then
+    elif [[ ${1} == '-r' ]]; then
+      shift
       r="${1}"
     else
       echo "internal function error: _getfile_queue, unexpected argument '${1}'" >&2
