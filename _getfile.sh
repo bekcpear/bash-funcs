@@ -73,6 +73,16 @@
 #   the default download command,
 #   \"\${_file}\" and \"\${_url}\" should be used as the same format
 #
+# example:
+#   . /path/to/_getfile.sh
+#   _getfile_queue -v "dsig fp:${fp} key:${key_url} url:${asc_url} path:${local_key_path}" \
+#                  -l ${tarball_path} -r ${tarball_url}
+#   _getfile_queue -v "sha256 hash:affc8559df1d9e90b787c77df6ad429bc345a6c508480ea48d975342024113c7" \
+#                  -l ${file_path} -r ${file_url}
+#   _getfile_queue -v "sha512 url:https://example.com/filename.sha256.txt" \
+#                  -l ${file1_path} -r ${file1_url}
+#   _getfile
+#
 [[ -z ${_BASHFUNC_GETFILE} ]] || return 0
 _BASHFUNC_GETFILE=1
 
