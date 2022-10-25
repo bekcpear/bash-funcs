@@ -226,9 +226,9 @@ _getfile_queue() {
 
 __bashfunc_getfile_do() {
   if [[ -n ${_BASHFUNC_DO} ]]; then
-    _do "${@}"
+    _do -p '***_getfile***' "${@}"
   else
-    echo -n ">>> " >&2
+    echo -n "***_getfile*** >>> " >&2
     echo "${@}" >&2
     "${@}"
   fi
