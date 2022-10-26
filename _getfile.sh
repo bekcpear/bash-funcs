@@ -58,6 +58,18 @@
 # There are also a set of variables to control some features.
 #
 # variable:
+#   _BASHFUNC_GETFILE_TRAP_CLEARFUNC_FOR_ERR
+# default:
+#   <UNSET>
+# description:
+#   if 'set -e' is set, this variable can control to call the function
+#   of cleaning trashes when ERR signal triggered, these trashes are the
+#   temporary files generated during executing, when 'set -e' is set,
+#   and an error occurred during executing, these trashes may not be cleand
+#   without this variable set, or, you can add __bashfunc_getfile_clear_trashes
+#   func to you own ERR trap manually.
+#
+# variable:
 #   _BASHFUNC_GETFILE_FORCE_VERIFICATION
 # default:
 #   <UNSET>
@@ -87,6 +99,7 @@
 _BASHFUNC_GETFILE=1
 
 declare -i __BASHFUNC_GETFILE_FILE_INDEX=0
+declare -A __BASHFUNC_GETFILE_FILE_INDEX_R
 declare -a __BASHFUNC_GETFILE_FILE_LOCAL \
            __BASHFUNC_GETFILE_FILE_REMOTE \
            __BASHFUNC_GETFILE_FILE_HAS_VMETHOD \
@@ -108,6 +121,31 @@ declare -a __BASHFUNC_GETFILE_FILE_LOCAL \
            __BASHFUNC_GETFILE_FILE_HASH_SHA512 \
            __BASHFUNC_GETFILE_FILE_HASH_SHA512_TYPE
 
+__bashfunc_getfile_unset() {
+  local path=
+  path=${__BASHFUNC_GETFILE_FILE_LOCAL[$1]}
+  eval "unset __BASHFUNC_GETFILE_FILE_INDEX_R[\"$path\"]"
+  eval "unset __BASHFUNC_GETFILE_FILE_LOCAL[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_REMOTE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HAS_VMETHOD[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_SIG_TYPE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_SIG_LOCAL[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_SIG_REMOTE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_SIG_KEY_FP[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_SIG_KEY_REMOTE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_B2[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_B2_TYPE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_MD5[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_MD5_TYPE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA1[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA1_TYPE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA256[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA256_TYPE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA384[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA384_TYPE[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA512[$1]"
+  eval "unset __BASHFUNC_GETFILE_FILE_HASH_SHA512_TYPE[$1]"
+}
 __bashfunc_getfile_queue_missing_arg() {
   if [[ -z ${1} ]]; then
     echo "internal function error: _getfile_queue, missing necessary argument '${2}' for '${3}' verify method." >&2
@@ -116,7 +154,7 @@ __bashfunc_getfile_queue_missing_arg() {
 }
 _getfile_queue() {
   local -a v
-  local l r index next_index
+  local l r path index next_index
   while [[ -n "${1}" ]]; do
     if [[ ${1} == '-v' ]]; then
       shift
@@ -143,15 +181,13 @@ _getfile_queue() {
     return 1
   fi
 
-  for (( _i = 0; _i < ${__BASHFUNC_GETFILE_FILE_INDEX}; _i++ )) do
-    if [[ $(realpath -m "${__BASHFUNC_GETFILE_FILE_LOCAL[$_i]}") == $(realpath -m "${l}") ]]; then
+  for path in "${__BASHFUNC_GETFILE_FILE_LOCAL[@]}"; do
+    if [[ $(realpath -m "${path}") == $(realpath -m "${l}") ]]; then
       echo "internal function warning: _getfile_queue, the local path '${l}' already queued." >&2
       echo "                                           update existing attributes ..." >&2
-      # if an attribute exists,
-      # but you don't provid a new one to override it,
-      # the old one will not be removed
-      index=${_i}
+      eval "index=\${__BASHFUNC_GETFILE_FILE_INDEX_R[\"${path}\"]}"
       next_index=${__BASHFUNC_GETFILE_FILE_INDEX}
+      __bashfunc_getfile_unset ${index}
     fi
   done
   : ${index:=${__BASHFUNC_GETFILE_FILE_INDEX}}
@@ -229,6 +265,7 @@ _getfile_queue() {
     esac
   done
 
+  eval "__BASHFUNC_GETFILE_FILE_INDEX_R[\"${l}\"]=${index}"
   __BASHFUNC_GETFILE_FILE_INDEX=${next_index:-$(( ${__BASHFUNC_GETFILE_FILE_INDEX} + 1 ))}
 }
 
@@ -282,164 +319,170 @@ __bashfunc_getfile_key_exists() {
     return 1
   fi
 }
+__bashfunc_getfile_clear_trashes() {
+  local _ret=${1}
+  : ${_ret:=$?}
+  local _i _count=${#__BASHFUNC_GETFILE_FILE_TRASHES[@]}
+  if [[ ${_count} -gt 0 ]]; then
+    __bashfunc_getfile_log i "remove trashes ..."
+  fi
+  for (( _i = 0; _i < ${_count}; _i++ )); do
+    __bashfunc_getfile_do rm -f "${__BASHFUNC_GETFILE_FILE_TRASHES[$_i]}"
+    eval "unset __BASHFUNC_GETFILE_FILE_TRASHES[$_i]"
+  done
+  return ${_ret}
+}
 _getfile() {
-  (
-    local ret=0 _ret=0
-    local -a trashes
-    clear_trashes() {
-      local _i _count=${#trashes[@]}
-      if [[ ${_count} -gt 0 ]]; then
-        __bashfunc_getfile_log i "remove trashes ..."
-      fi
-      for (( _i = 0; _i < ${_count}; _i++ )); do
-        __bashfunc_getfile_do rm -f "${trashes[$_i]}"
-        eval "unset trashes[$_i]"
-      done
-      exit ${ret}
-    }
-    trap 'clear_trashes' EXIT
+  local ret
 
-    for (( i = 0; i < ${__BASHFUNC_GETFILE_FILE_INDEX}; i++ )); do
-      local fp= key= sig_path= sig_url= path= downloaded= completed= tmpfile=
-      local -a h= h_type= h_cmd=
+  declare -a __BASHFUNC_GETFILE_FILE_TRASHES=()
+  if [[ $(set +o | grep errexit) == "set -o errexit" ]] && \
+     [[ -n ${_BASHFUNC_GETFILE_TRAP_CLEARFUNC_FOR_ERR} ]]; then
+    trap '__bashfunc_getfile_clear_trashes' ERR
+  fi
 
-      __getfile() {
-        path=${__BASHFUNC_GETFILE_FILE_LOCAL[$i]}
-        ___verify_fail_handler() {
-          __bashfunc_getfile_log e "verify '${path}' failed with method '${1}', removing it ..."
-          __bashfunc_getfile_do rm -f "${path}"
-        }
+  for path in "${__BASHFUNC_GETFILE_FILE_LOCAL[@]}"; do
+    local i= fp= key= sig_path= sig_url= downloaded= completed= tmpfile=
+    local -a h=() h_type=() h_cmd=()
 
-        # check if force verification set
-        if [[ -z ${__BASHFUNC_GETFILE_FILE_HAS_VMETHOD[${i}]} ]] && \
-           [[ -n ${_BASHFUNC_GETFILE_FORCE_VERIFICATION} ]]; then
-          __bashfunc_getfile_log w "force verification is set, but there is no verify method for file '${path}', skipping ..."
-          completed=1
-          return 1
-        fi
+    eval "i=\${__BASHFUNC_GETFILE_FILE_INDEX_R[\"${path}\"]}"
 
-        # download if local file does not exists
-        if [[ ! -e ${path} ]]; then
-          downloaded=1
-          __bashfunc_getfile_curl "${path}" "${__BASHFUNC_GETFILE_FILE_REMOTE[$i]}" || return $?
-        fi
-
-        # do verification
-        # verify signature
-        if [[ -n ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} ]]; then
-          fp="${__BASHFUNC_GETFILE_FILE_SIG_KEY_FP[$i]#0x}"
-          fp="${fp#0X}"
-          fp="${fp:+0x}${fp}"
-          key="${__BASHFUNC_GETFILE_FILE_SIG_KEY_REMOTE[$i]}"
-          __bashfunc_getfile_log i "verifying '${path}' by signature ..."
-          if [[ -z ${fp} ]]; then
-            if [[ -n ${key} ]]; then
-              __bashfunc_getfile_key_import "${key}"
-            fi
-          else
-            if ! __bashfunc_getfile_key_exists "${fp}"; then
-              __bashfunc_getfile_log w "key '${fp}' does not exist"
-              __bashfunc_getfile_key_import "${key}" "${fp}"
-            fi
-          fi
-          case ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} in
-            binded)
-              __bashfunc_getfile_log i "binded signature"
-              tmpfile=$(mktemp -u)
-              if __bashfunc_getfile_do gpg --output "${tmpfile}" --decrypt "${path}"; then
-                __bashfunc_getfile_do mv "${tmpfile}" "${path}"
-              else
-                ___verify_fail_handler "binded signature"
-                return 1
-              fi
-              ;;
-            detached)
-              __bashfunc_getfile_log i "detached signature"
-              sig_path="${__BASHFUNC_GETFILE_FILE_SIG_LOCAL[$i]}"
-              sig_url="${__BASHFUNC_GETFILE_FILE_SIG_REMOTE[$i]}"
-              if [[ -e "${sig_path}" ]]; then
-                __bashfunc_getfile_log i "use local signature file '${sig_path}' to verify ..."
-              else
-                if [[ -z ${sig_path} ]]; then
-                  sig_path="$(mktemp -u)"
-                  trashes+=("${sig_path}")
-                fi
-                __bashfunc_getfile_log i "downloading signature file from '${sig_url}' ..."
-                __bashfunc_getfile_curl "${sig_path}" "${sig_url}"
-              fi
-              if ! __bashfunc_getfile_do gpg --verify "${sig_path}" "${path}"; then
-                ___verify_fail_handler "detached signature"
-                return 1
-              fi
-              ;;
-          esac
-        fi
-
-        # verify hash
-        ___check_hash() {
-          __bashfunc_getfile_log i "verifying '${path}' by '${3}' ..."
-          local bname=$(basename "${path}") _h _match _file
-          if [[ -z ${1} ]]; then
-            _file=$(mktemp -u)
-            trashes+=("${_file}")
-            __bashfunc_getfile_log i "getting hash value from '${2}' ..."
-            __bashfunc_getfile_curl "${_file}" "${2}"
-            h=($(grep -E "${bname}[[:space:]]*$" | cur -d' ' -f1))
-          else
-            h=(${2})
-          fi
-          _h=$("${3}" "${path}" | cut -d' ' -f1)
-          for __h in "${h[@]}"; do
-            __bashfunc_getfile_log i "checking hash ..."
-            __bashfunc_getfile_log i "  expect: ${__h}"
-            __bashfunc_getfile_log i "  actual: ${_h}"
-            if [[ "${__h}" == "${_h}" ]]; then
-              _match=1
-            fi
-          done
-          if [[ -z ${_match} ]]; then
-            ___verify_fail_handler "${3}"
-            return 1
-          fi
-        }
-             h+=(${__BASHFUNC_GETFILE_FILE_HASH_B2[$i]})
-        h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_B2_TYPE[$i]})
-         h_cmd+=("b2sum")
-             h+=(${__BASHFUNC_GETFILE_FILE_HASH_MD5[$i]})
-        h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_MD5_TYPE[$i]})
-         h_cmd+=("md5sum")
-             h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA1[$i]})
-        h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA1_TYPE[$i]})
-         h_cmd+=("sha1sum")
-             h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA256[$i]})
-        h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA256_TYPE[$i]})
-         h_cmd+=("sha256sum")
-             h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA384[$i]})
-        h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA384_TYPE[$i]})
-         h_cmd+=("sha384sum")
-             h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA512[$i]})
-        h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA512_TYPE[$i]})
-         h_cmd+=("sha512sum")
-        for (( j = 0; j < ${#h[@]}; j++ )); do
-          if [[ -n ${h[$j]} ]]; then
-            ___check_hash "${h_type[$j]}" "${h[$j]}" "${h_cmd[$j]}" || return $?
-          fi
-        done
-
-        completed=1
+    __getfile() {
+      ___verify_fail_handler() {
+        __bashfunc_getfile_log e "verify '${path}' failed with method '${1}', removing it ..."
+        __bashfunc_getfile_do rm -f "${path}"
       }
 
-      # retry if not yet download
-      while [[ -z ${downloaded} ]] && [[ -z ${completed} ]]; do
-        __getfile || _ret=$?
-        # save the first error exit code during the whole for loop
-        if [[ ${ret} == 0 ]]; then
-          ret=${_ret}
+      # check if force verification set
+      if [[ -z ${__BASHFUNC_GETFILE_FILE_HAS_VMETHOD[${i}]} ]] && \
+         [[ -n ${_BASHFUNC_GETFILE_FORCE_VERIFICATION} ]]; then
+        __bashfunc_getfile_log w "force verification is set, but there is no verify method for file '${path}', skipping ..."
+        completed=1
+        return 1
+      fi
+
+      # download if local file does not exists
+      if [[ ! -e ${path} ]]; then
+        downloaded=1
+        __bashfunc_getfile_curl "${path}" "${__BASHFUNC_GETFILE_FILE_REMOTE[$i]}" || return $?
+      fi
+
+      # do verification
+      # verify signature
+      if [[ -n ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} ]]; then
+        fp="${__BASHFUNC_GETFILE_FILE_SIG_KEY_FP[$i]#0x}"
+        fp="${fp#0X}"
+        fp="${fp:+0x}${fp}"
+        key="${__BASHFUNC_GETFILE_FILE_SIG_KEY_REMOTE[$i]}"
+        __bashfunc_getfile_log i "verifying '${path}' by signature ..."
+        if [[ -z ${fp} ]]; then
+          if [[ -n ${key} ]]; then
+            __bashfunc_getfile_key_import "${key}"
+          fi
+        else
+          if ! __bashfunc_getfile_key_exists "${fp}"; then
+            __bashfunc_getfile_log w "key '${fp}' does not exist"
+            __bashfunc_getfile_key_import "${key}" "${fp}"
+          fi
+        fi
+        case ${__BASHFUNC_GETFILE_FILE_SIG_TYPE[$i]} in
+          binded)
+            __bashfunc_getfile_log i "binded signature"
+            tmpfile=$(mktemp -u)
+            if __bashfunc_getfile_do gpg --output "${tmpfile}" --decrypt "${path}"; then
+              __bashfunc_getfile_do mv "${tmpfile}" "${path}"
+            else
+              ___verify_fail_handler "binded signature"
+              return 1
+            fi
+            ;;
+          detached)
+            __bashfunc_getfile_log i "detached signature"
+            sig_path="${__BASHFUNC_GETFILE_FILE_SIG_LOCAL[$i]}"
+            sig_url="${__BASHFUNC_GETFILE_FILE_SIG_REMOTE[$i]}"
+            if [[ -e "${sig_path}" ]]; then
+              __bashfunc_getfile_log i "use local signature file '${sig_path}' to verify ..."
+            else
+              if [[ -z ${sig_path} ]]; then
+                sig_path="$(mktemp -u)"
+                __BASHFUNC_GETFILE_FILE_TRASHES+=("${sig_path}")
+              fi
+              __bashfunc_getfile_log i "downloading signature file from '${sig_url}' ..."
+              __bashfunc_getfile_curl "${sig_path}" "${sig_url}"
+            fi
+            if ! __bashfunc_getfile_do gpg --verify "${sig_path}" "${path}"; then
+              ___verify_fail_handler "detached signature"
+              return 1
+            fi
+            ;;
+        esac
+      fi
+
+      # verify hash
+      ___check_hash() {
+        __bashfunc_getfile_log i "verifying '${path}' by '${3}' ..."
+        local bname=$(basename "${path}") _h _match _file
+        if [[ -z ${1} ]]; then
+          _file=$(mktemp -u)
+          __BASHFUNC_GETFILE_FILE_TRASHES+=("${_file}")
+          __bashfunc_getfile_log i "getting hash value from '${2}' ..."
+          __bashfunc_getfile_curl "${_file}" "${2}"
+          h=($(grep -E "${bname}[[:space:]]*$" | cur -d' ' -f1))
+        else
+          h=(${2})
+        fi
+        _h=$("${3}" "${path}" | cut -d' ' -f1)
+        for __h in "${h[@]}"; do
+          __bashfunc_getfile_log i "checking hash ..."
+          __bashfunc_getfile_log i "  expect: ${__h}"
+          __bashfunc_getfile_log i "  actual: ${_h}"
+          if [[ "${__h}" == "${_h}" ]]; then
+            _match=1
+          fi
+        done
+        if [[ -z ${_match} ]]; then
+          ___verify_fail_handler "${3}"
+          return 1
+        fi
+      }
+           h+=(${__BASHFUNC_GETFILE_FILE_HASH_B2[$i]})
+      h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_B2_TYPE[$i]})
+       h_cmd+=("b2sum")
+           h+=(${__BASHFUNC_GETFILE_FILE_HASH_MD5[$i]})
+      h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_MD5_TYPE[$i]})
+       h_cmd+=("md5sum")
+           h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA1[$i]})
+      h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA1_TYPE[$i]})
+       h_cmd+=("sha1sum")
+           h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA256[$i]})
+      h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA256_TYPE[$i]})
+       h_cmd+=("sha256sum")
+           h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA384[$i]})
+      h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA384_TYPE[$i]})
+       h_cmd+=("sha384sum")
+           h+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA512[$i]})
+      h_type+=(${__BASHFUNC_GETFILE_FILE_HASH_SHA512_TYPE[$i]})
+       h_cmd+=("sha512sum")
+      for (( j = 0; j < ${#h[@]}; j++ )); do
+        if [[ -n ${h[$j]} ]]; then
+          ___check_hash "${h_type[$j]}" "${h[$j]}" "${h_cmd[$j]}" || return $?
         fi
       done
 
+      # remove successful job
+      __bashfunc_getfile_log i "removing successful record (file: '${path}', index: ${i}) from the queue ..."
+      __bashfunc_getfile_unset ${i}
+
+      completed=1
+    }
+
+    # retry if not yet download
+    while [[ -z ${downloaded} ]] && [[ -z ${completed} ]]; do
+      __getfile || ret=$?
     done
-  )
+
+  done
+  __bashfunc_getfile_clear_trashes ${ret}
 }
 #
 # BASHFUNC04: _getfile
