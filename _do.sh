@@ -44,7 +44,7 @@
 _BASHFUNC_DO=1
 
 if [[ -z ${_BASHFUNC_DO_OFD} ]]; then
-  eval "exec {_BASHFUNC_DO_OFD}>$(realpath /proc/$$/fd/1)"
+  eval "exec {_BASHFUNC_DO_OFD}>&1"
 fi
 
 : ${_BASHFUNC_DO_DATE:=on}
