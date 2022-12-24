@@ -123,7 +123,7 @@ _vercmp() {
     for _s in "${!_strA}"; do
       if [[ -n ${!_strV} ]]; then
         eval "${_str}_pre=\"${_s}\""
-      elif [[ ${_s} =~ ^[vV]?[0-9]+\. ]]; then
+      elif [[ ${_s} =~ ^[vV]?[0-9]+\.? ]]; then
         _s="${_s#v}"
         eval "${_str}_ver=\"${_s#V}\""
       else
